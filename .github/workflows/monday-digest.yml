@@ -1,0 +1,39 @@
+name: Monday event digest
+
+on:
+  schedule:
+    - cron: "30 1 * * 1" # Monday 07:00 IST (01:30 UTC). GitHub may delay scheduled runs by several minutes.
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Send even if a digest was already sent in the last 5 days"
+        type: boolean
+        default: false
+
+concurrency:
+  group: monday-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build and send digest
+        run: npm run digest
+        env:
+          FORCE_DIGEST: ${{ inputs.force }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          VIKRAM_EMAIL: ${{ secrets.VIKRAM_EMAIL }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}

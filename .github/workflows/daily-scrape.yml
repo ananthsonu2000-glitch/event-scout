@@ -1,0 +1,34 @@
+name: Daily event scrape
+
+on:
+  schedule:
+    - cron: "30 0 * * *" # 06:00 IST every day (GitHub cron is UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium (for dynamic sources)
+        run: npx playwright install --with-deps chromium
+      - name: Scrape, normalize, dedupe and rank
+        run: npm run scrape
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          VIKRAM_EMAIL: ${{ secrets.VIKRAM_EMAIL }}
