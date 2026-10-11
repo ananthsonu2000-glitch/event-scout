@@ -1,26 +1,40 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import { ChevronDown, Clock } from "lucide-react";
+import { ClosingSoon } from "@/components/ClosingSoon";
+import { DetailDrawer } from "@/components/DetailDrawer";
+import { EmptyState, ErrorState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
 import { EventDetail } from "@/components/EventDetail";
-import { Filters } from "@/components/Filters";
-import { filterOptions, getEvent, listEvents, viewCounts } from "@/lib/queries";
+import { FilterBar } from "@/components/FilterBar";
+import { SummaryStats } from "@/components/SummaryStats";
+import { addDays, todayIST } from "@/lib/dates";
+import { dashboardMeta, filterOptions, getEvent, listEvents, viewCounts, type EventFilters } from "@/lib/queries";
+import type { EventRow } from "@/lib/types";
+import { timeAgo } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
 
-const VIEWS = [
-  { key: "all", label: "All Events" },
-  { key: "high", label: "High Priority" },
-  { key: "deadline", label: "Deadline Soon" },
-  { key: "linkedin", label: "LinkedIn Signals" },
-  { key: "review", label: "Needs Review" },
-];
-
+const VIEW_KEYS = ["all", "high", "deadline", "linkedin", "review"];
 type SP = Record<string, string | string[] | undefined>;
+
+const GROUPS: { key: string; label: string; dot: string }[] = [
+  { key: "High", label: "High priority", dot: "bg-rose-500" },
+  { key: "Medium", label: "Medium priority", dot: "bg-amber-400" },
+  { key: "Low", label: "Low priority", dot: "bg-slate-300" },
+  { key: "Unranked", label: "Not yet ranked", dot: "bg-slate-200" },
+];
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<SP> }) {
   const raw = await searchParams;
   const sp: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) if (typeof v === "string" && v) sp[k] = v;
-  const view = VIEWS.some((v) => v.key === sp.view) ? sp.view : "all";
+  const view = VIEW_KEYS.includes(sp.view) ? sp.view : "all";
+  const sort = sp.sort ?? "relevance";
+  const today = todayIST();
+
+  // "This week" / "Next 30 days" presets become a date window; custom From/To wins when set.
+  const from = sp.from ?? (sp.range ? today : undefined);
+  const to = sp.to ?? (sp.range === "week" ? addDays(today, 7) : sp.range === "30" ? addDays(today, 30) : undefined);
 
   const href = (patch: Record<string, string | undefined>) => {
     const next = { ...sp, ...patch };
@@ -28,63 +42,94 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     return `/?${qs.toString()}`;
   };
 
+  const filters: EventFilters = { view, city: sp.city, category: sp.category, source: sp.source, from, to, q: sp.q, includePast: sp.past === "1", sort };
   const eventId = Number(sp.event);
+
   let data;
   try {
-    const [events, counts, options, selected] = await Promise.all([
-      listEvents({ view, city: sp.city, category: sp.category, source: sp.source, from: sp.from, to: sp.to, q: sp.q, includePast: sp.past === "1" }),
+    const [events, counts, options, meta, selected, closing] = await Promise.all([
+      listEvents(filters),
       viewCounts(),
       filterOptions(),
+      dashboardMeta(today),
       eventId ? getEvent(eventId) : Promise.resolve(null),
+      view === "deadline" ? Promise.resolve([] as EventRow[]) : listEvents({ view: "deadline", sort: "deadline" }, 8),
     ]);
-    data = { events, counts, options, selected };
+    data = { events, counts, options, meta, selected, closing };
   } catch (err) {
     return (
-      <div className="card p-6">
-        <h1 className="text-lg font-bold">Database not reachable</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Set <code>DATABASE_URL</code> in <code>.env.local</code>, then run <code>npm run db:migrate</code> and <code>npm run db:seed</code>.
+      <ErrorState title="Can't load events" detail={String(err instanceof Error ? err.message : err)}>
+        <p>
+          Check <code>DATABASE_URL</code>, then reload. For a fresh database run <code>npm run db:migrate</code> and <code>npm run db:seed</code>.
         </p>
-        <pre className="mt-3 overflow-x-auto rounded bg-slate-100 p-3 text-xs">{String(err instanceof Error ? err.message : err)}</pre>
-      </div>
+      </ErrorState>
     );
   }
-  const { events, counts, options, selected } = data;
+  const { events, counts, options, meta, selected, closing } = data;
+  const grouped = sort === "relevance" && view !== "deadline";
+  const filtered = !!(sp.q || sp.city || sp.category || sp.source || sp.range || sp.from || sp.to || view !== "all");
+  let n = 0;
+
+  const card = (e: EventRow) => <EventCard key={e.id} event={e} href={href({ event: String(e.id) })} selected={selected?.id === e.id} today={today} delay={n++} />;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.key}
-            href={href({ view: v.key, event: undefined })}
-            className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
-              view === v.key ? "border-ink bg-ink text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            {v.label} <span className="opacity-70">{counts[v.key] ?? 0}</span>
-          </Link>
-        ))}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Event intelligence</h1>
+          <p className="text-sm text-slate-500">Ranked opportunities for the next 30 days.</p>
+        </div>
+        <p className="flex items-center gap-1.5 text-xs text-slate-500" title="Time of the most recent scraper run">
+          <Clock size={13} aria-hidden /> Last updated {timeAgo(meta.lastRunEpoch)}
+        </p>
       </div>
 
-      <Filters values={{ ...sp, view }} options={options} />
+      <SummaryStats counts={counts} meta={meta} activeView={view} hrefFor={(v) => href({ view: v === "all" ? undefined : v, event: undefined })} />
 
-      <div className={`grid gap-4 ${selected ? "lg:grid-cols-[1fr_440px]" : ""}`}>
-        <section className="space-y-3">
-          <p className="text-sm text-slate-500">{events.length} event{events.length === 1 ? "" : "s"}</p>
+      <Suspense fallback={<div className="card h-32 animate-pulse bg-slate-100" />}>
+        <FilterBar options={options} counts={counts} />
+      </Suspense>
+
+      {view !== "deadline" && !filtered && <ClosingSoon events={closing} today={today} hrefFor={(id) => href({ event: String(id) })} />}
+
+      <div className={`grid items-start gap-4 ${selected ? "lg:grid-cols-[minmax(0,1fr)_440px]" : ""}`}>
+        <section aria-label="Events" className="min-w-0 space-y-4">
+          <p className="text-sm text-slate-500" aria-live="polite">
+            {events.length} event{events.length === 1 ? "" : "s"}
+            {filtered ? " match your filters" : ""}
+          </p>
+
           {events.length === 0 && (
-            <div className="card p-8 text-center text-sm text-slate-500">
-              No events match. Try another view or reset the filters.
-            </div>
+            <EmptyState
+              title={filtered ? "No events match these filters" : "No events yet"}
+              hint={filtered ? "Try a wider time range or clear a filter." : "Events appear after the next daily scrape, or add one manually."}
+              action={filtered ? { href: "/", label: "Clear all filters" } : { href: "/add", label: "Add an event" }}
+            />
           )}
-          {events.map((e) => (
-            <EventCard key={e.id} event={e} href={href({ event: String(e.id) })} selected={selected?.id === e.id} />
-          ))}
+
+          {grouped
+            ? GROUPS.map((g) => {
+                const items = events.filter((e) => (e.priority ?? "Unranked") === g.key);
+                if (!items.length) return null;
+                return (
+                  <details key={g.key} open className="group/section">
+                    <summary className="mb-2 flex cursor-pointer items-center gap-2 select-none">
+                      <span className={`h-2.5 w-2.5 rounded-full ${g.dot}`} aria-hidden />
+                      <h2 className="text-sm font-semibold text-slate-800">{g.label}</h2>
+                      <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-600">{items.length}</span>
+                      <ChevronDown size={15} className="chevron ml-auto text-slate-400 transition" aria-hidden />
+                    </summary>
+                    <div className="space-y-2.5">{items.map(card)}</div>
+                  </details>
+                );
+              })
+            : events.length > 0 && <div className="space-y-2.5">{events.map(card)}</div>}
         </section>
+
         {selected && (
-          <div>
-            <EventDetail event={selected} closeHref={href({ event: undefined })} />
-          </div>
+          <DetailDrawer closeHref={href({ event: undefined })}>
+            <EventDetail event={selected} closeHref={href({ event: undefined })} today={today} />
+          </DetailDrawer>
         )}
       </div>
     </div>

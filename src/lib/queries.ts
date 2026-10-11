@@ -40,6 +40,8 @@ export interface EventFilters {
   to?: string;
   q?: string;
   includePast?: boolean;
+  /** relevance (default) | date | deadline | recent */
+  sort?: string;
 }
 
 const PRIORITY_ORDER = `case priority when 'High' then 1 when 'Medium' then 2 when 'Low' then 3 else 4 end`;
@@ -68,9 +70,15 @@ export async function listEvents(f: EventFilters, limit = 200): Promise<EventRow
   }
 
   const order =
-    f.view === "deadline"
-      ? `registration_deadline asc, ${PRIORITY_ORDER}`
-      : `${PRIORITY_ORDER}, event_date asc nulls last, relevance_score desc nulls last`;
+    f.sort === "date"
+      ? `event_date asc nulls last, relevance_score desc nulls last`
+      : f.sort === "deadline"
+        ? `registration_deadline asc nulls last, ${PRIORITY_ORDER}`
+        : f.sort === "recent"
+          ? `created_at desc`
+          : f.view === "deadline"
+            ? `registration_deadline asc, ${PRIORITY_ORDER}`
+            : `${PRIORITY_ORDER}, relevance_score desc nulls last, event_date asc nulls last`;
 
   return query<EventRow>(
     `select ${EVENT_COLS} from events ${where.length ? `where ${where.join(" and ")}` : ""}
@@ -127,4 +135,31 @@ export async function refreshDerived(today: string): Promise<void> {
          else 'deadline_unknown' end`,
     [today],
   );
+}
+
+export interface DashboardMeta {
+  sourcesCheckedToday: number;
+  sourcesFailing: number;
+  lastRunEpoch: number | null;
+}
+
+/** Freshness + source health for the dashboard header. Pipeline pseudo-sources are excluded. */
+export async function dashboardMeta(today: string): Promise<DashboardMeta> {
+  const [checked] = await query<{ n: string }>(
+    `select count(distinct source_name) as n from scraper_runs
+     where source_name not like 'Pipeline:%' and (started_at at time zone 'Asia/Kolkata')::date = $1::date`,
+    [today],
+  );
+  const [failing] = await query<{ n: string }>(
+    `select count(*) as n from (
+       select distinct on (source_name) source_name, status from scraper_runs
+       where source_name not like 'Pipeline:%' order by source_name, started_at desc
+     ) t where status = 'failed'`,
+  );
+  const [last] = await query<{ e: string | null }>(`select extract(epoch from max(finished_at))::text as e from scraper_runs`);
+  return {
+    sourcesCheckedToday: Number(checked?.n ?? 0),
+    sourcesFailing: Number(failing?.n ?? 0),
+    lastRunEpoch: last?.e ? Number(last.e) * 1000 : null,
+  };
 }
