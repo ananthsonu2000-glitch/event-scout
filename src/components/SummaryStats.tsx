@@ -26,7 +26,7 @@ function Tile({ href, active, icon, label, value, sub, tone, visual }: { href: s
       </div>
       <div className="flex items-end justify-between gap-2">
         <div className="min-w-0">
-          <CountUp value={value} className="block text-3xl font-bold leading-none tracking-tight tabular-nums text-slate-900" />
+          <CountUp value={value} className="font-display block text-5xl tabular-nums text-slate-900" />
           {sub && <div className="mt-2 text-xs leading-snug text-slate-500">{sub}</div>}
         </div>
         {visual}

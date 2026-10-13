@@ -43,7 +43,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-white">
           <Radar size={18} aria-hidden />
         </span>
-        <span className="text-[15px] font-bold tracking-tight text-slate-900">Event Scout</span>
+        <span className="font-display text-2xl text-slate-900">Event Scout</span>
         <span className="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">v1</span>
       </Link>
 

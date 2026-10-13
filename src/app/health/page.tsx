@@ -91,8 +91,8 @@ export default async function Health() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Source health</h1>
-        <p className="text-sm text-slate-500">Latest result per source, digest delivery and raw logs. Times are IST.</p>
+        <h1 className="page-title">Source health</h1>
+        <p className="page-lead">Latest result per source, digest delivery and raw logs. Times are IST.</p>
       </div>
 
       <div className={`flex items-center gap-3 rounded-lg border p-3.5 text-sm ${failing.length || digestFailed ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status">

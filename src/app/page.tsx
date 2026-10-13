@@ -83,8 +83,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Event intelligence</h1>
-          <p className="text-sm text-slate-500">Ranked opportunities for the next 30 days.</p>
+          <h1 className="page-title">Event intelligence</h1>
+          <p className="page-lead">Ranked opportunities for the next 30 days, filtered for your cities and audience.</p>
         </div>
         <AutoRefresh lastRunEpoch={meta.lastRunEpoch} />
       </div>

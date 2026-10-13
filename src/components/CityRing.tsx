@@ -71,7 +71,7 @@ export function CityRing({ slices }: { slices: CitySlice[] }) {
               ))}
             </svg>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-2xl font-bold tabular-nums leading-none text-slate-900">{center ? center.n : total}</span>
+              <span className="font-display text-4xl tabular-nums text-slate-900">{center ? center.n : total}</span>
               <span className="mt-1 max-w-[5.5rem] truncate text-[11px] text-slate-500">{center ? center.city : "events"}</span>
             </div>
           </div>

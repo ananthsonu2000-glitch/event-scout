@@ -10,8 +10,8 @@ export default async function AddEvent({ searchParams }: { searchParams: Promise
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Add an event</h1>
-        <p className="text-sm text-slate-500">For anything the scrapers can&apos;t see: a private LinkedIn post, a forwarded invite, a conference flyer.</p>
+        <h1 className="page-title">Add an event</h1>
+        <p className="page-lead">For anything the scrapers can&apos;t see: a private LinkedIn post, a forwarded invite, a conference flyer.</p>
       </div>
 
       {sp.error && (

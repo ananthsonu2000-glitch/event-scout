@@ -24,6 +24,18 @@ body {
   .label {
     @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500;
   }
+  /* Headlines and big numbers: tall serif, tight tracking and leading. Single weight, so no font-bold on these. */
+  .font-display {
+    @apply font-serif font-normal;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+  .page-title {
+    @apply font-display text-[2.5rem] text-slate-900 sm:text-5xl;
+  }
+  .page-lead {
+    @apply mt-2 max-w-2xl text-[13px] leading-relaxed text-slate-500;
+  }
   .section-title {
     @apply text-sm font-semibold text-slate-900;
   }

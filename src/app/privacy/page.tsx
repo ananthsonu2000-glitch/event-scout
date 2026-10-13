@@ -3,8 +3,8 @@ export const metadata = { title: "Privacy Policy · Industry Event Scout" };
 export default function Privacy() {
   return (
     <article className="mx-auto max-w-2xl space-y-4 text-sm leading-relaxed">
-      <h1 className="text-xl font-bold">Privacy Policy</h1>
-      <p className="text-slate-500">Industry Event Scout is a personal, single-user tool. Last updated 11 October 2026.</p>
+      <h1 className="page-title">Privacy Policy</h1>
+      <p className="page-lead">Industry Event Scout is a personal, single-user tool. Last updated 11 October 2026.</p>
 
       <h2 className="pt-2 text-base font-semibold">What it accesses</h2>
       <p>

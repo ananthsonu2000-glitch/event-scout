@@ -15,8 +15,8 @@ export default async function Preferences({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Preferences</h1>
-        <p className="text-sm text-slate-500">These guide how Gemini ranks every event. Type a value and press Enter or comma to add it.</p>
+        <h1 className="page-title">Preferences</h1>
+        <p className="page-lead">These guide how Gemini ranks every event. Type a value and press Enter or comma to add it.</p>
       </div>
 
       {sp.saved && (

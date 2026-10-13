@@ -19,8 +19,8 @@ export default async function Sources({ searchParams }: { searchParams: Promise<
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Event sources</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="page-title">Event sources</h1>
+          <p className="page-lead">
             {active} active of {sources.length}. Only active sources run in the daily scrape.
           </p>
         </div>
