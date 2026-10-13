@@ -15,7 +15,8 @@
     "gmail:auth": "tsx scripts/gmail-auth.ts",
     "rerank": "tsx scripts/rerank.ts",
     "dedupe": "tsx scripts/dedupe-existing.ts",
-    "backfill:deadlines": "tsx scripts/backfill-deadlines.ts"
+    "backfill:deadlines": "tsx scripts/backfill-deadlines.ts",
+    "gen:theme": "node scripts/gen-theme.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",

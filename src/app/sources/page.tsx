@@ -36,7 +36,7 @@ export default async function Sources({ searchParams }: { searchParams: Promise<
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {sources.map((s) => (
-          <article key={s.id} className={`card flex flex-col gap-3 p-4 transition ${s.active ? "" : "opacity-70"}`}>
+          <article key={s.id} className={`card flex min-w-0 flex-col gap-3 p-4 transition ${s.active ? "" : "opacity-70"}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <h2 className="truncate font-semibold text-slate-900">{s.name}</h2>
@@ -63,7 +63,7 @@ export default async function Sources({ searchParams }: { searchParams: Promise<
 
             {s.notes && <p className="line-clamp-2 text-xs text-slate-500">{s.notes}</p>}
 
-            <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <span className={`h-2 w-2 rounded-full ${s.last_status === "failed" ? "bg-red-500" : s.last_status === "success" ? "bg-emerald-500" : "bg-slate-300"}`} aria-hidden />
                 {s.last_status ? `${s.last_status} · ${s.last_run_at ?? ""}` : "Never run"}

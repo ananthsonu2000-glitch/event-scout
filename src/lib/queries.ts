@@ -41,6 +41,8 @@ export interface EventFilters {
   q?: string;
   includePast?: boolean;
   includeLow?: boolean;
+  /** exact priority filter, set by clicking a chart bar */
+  priority?: string;
   /** relevance (default) | date | deadline | recent */
   sort?: string;
 }
@@ -53,32 +55,46 @@ export const DATED_OR_MANUAL = `(source_type like 'manual%' or (event_date is no
 
 const PRIORITY_ORDER =`case priority when 'High' then 1 when 'Medium' then 2 when 'Low' then 3 else 4 end`;
 
-export async function listEvents(f: EventFilters, limit = 200): Promise<EventRow[]> {
+type Ignorable = "view" | "dates" | "city" | "priority" | "low";
+
+/**
+ * Builds the WHERE clause shared by the event list and the charts, so they always agree.
+ * `ignore` drops filters a chart should not obey (e.g. the city ring ignores the city filter so you can switch city).
+ */
+function buildWhere(f: EventFilters, ignore: Ignorable[] = []): { where: string[]; params: unknown[] } {
   const where: string[] = [];
   const params: unknown[] = [];
   const p = (v: unknown) => {
     params.push(v);
     return `$${params.length}`;
   };
+  const skip = (k: Ignorable) => ignore.includes(k);
+  const view = skip("view") ? undefined : f.view;
 
-  if (f.view === "high") where.push(`priority = 'High'`);
-  if (f.view === "deadline") where.push(`deadline_urgent`);
-  if (f.view === "linkedin") where.push(`is_linkedin_signal`);
-  if (f.view === "review") where.push(`needs_review`);
+  if (view === "high") where.push(`priority = 'High'`);
+  if (view === "deadline") where.push(`deadline_urgent`);
+  if (view === "linkedin") where.push(`is_linkedin_signal`);
+  if (view === "review") where.push(`needs_review`);
   // Events with no date found are only listed under "Needs review" (manual entries are always shown).
-  if (f.view !== "review") where.push(DATED_OR_MANUAL);
-  if (!f.includePast && f.view !== "review") where.push(`status <> 'past'`);
+  if (view !== "review") where.push(DATED_OR_MANUAL);
+  if (!f.includePast && view !== "review") where.push(`status <> 'past'`);
   // Low-priority events (wrong city, generic, weak audience) stay out of the lists unless asked for.
-  if (!f.includeLow && f.view !== "review") where.push(`priority is distinct from 'Low'`);
-  if (f.city) where.push(`city = ${p(f.city)}`);
+  if (!f.includeLow && !skip("low") && view !== "review") where.push(`priority is distinct from 'Low'`);
+  if (f.priority && !skip("priority")) where.push(`priority = ${p(f.priority)}`);
+  if (f.city && !skip("city")) where.push(`city = ${p(f.city)}`);
   if (f.category) where.push(`category = ${p(f.category)}`);
   if (f.source) where.push(`sources @> ${p(JSON.stringify([{ name: f.source }]))}::jsonb`);
-  if (f.from) where.push(`event_date >= ${p(f.from)}::date`);
-  if (f.to) where.push(`event_date <= ${p(f.to)}::date`);
+  if (f.from && !skip("dates")) where.push(`event_date >= ${p(f.from)}::date`);
+  if (f.to && !skip("dates")) where.push(`event_date <= ${p(f.to)}::date`);
   if (f.q) {
     const like = p(`%${f.q}%`);
     where.push(`(title ilike ${like} or description ilike ${like} or organizer ilike ${like} or reason ilike ${like})`);
   }
+  return { where, params };
+}
+
+export async function listEvents(f: EventFilters, limit = 200): Promise<EventRow[]> {
+  const { where, params } = buildWhere(f);
 
   const order =
     f.sort === "date"
@@ -96,6 +112,113 @@ export async function listEvents(f: EventFilters, limit = 200): Promise<EventRow
      order by ${order} limit ${Number(limit)}`,
     params,
   );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Chart data
+// ---------------------------------------------------------------------------------------------------------------
+export interface Bucket {
+  label: string;
+  from: string; // inclusive window used when the bar is clicked
+  to: string;
+  high: number;
+  medium: number;
+}
+
+const dayMs = 86_400_000;
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const addIso = (s: string, n: number) => iso(new Date(Date.parse(`${s}T00:00:00Z`) + n * dayMs));
+const mondayOf = (s: string) => {
+  const d = new Date(`${s}T00:00:00Z`);
+  return addIso(s, -((d.getUTCDay() + 6) % 7));
+};
+const shortDay = (s: string) => new Date(`${s}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/**
+ * Upcoming High and Medium events grouped into bars: one bar per day for 7D, per week (Monday start) for 30D and 90D.
+ * Obeys city/category/source/search filters, not the view or date filters.
+ */
+export async function eventsByPeriod(f: EventFilters, range: 7 | 30 | 90, today: string): Promise<Bucket[]> {
+  const { where, params } = buildWhere(f, ["view", "dates", "priority", "low"]);
+  const end = addIso(today, range - 1);
+  const daily = range === 7;
+  params.push(today, end);
+  const trunc = daily ? `to_char(event_date, 'YYYY-MM-DD')` : `to_char(date_trunc('week', event_date), 'YYYY-MM-DD')`;
+  const rows = await query<{ b: string; priority: string; n: number }>(
+    `select ${trunc} as b, priority, count(*)::int as n from events
+     where ${[...where, `priority in ('High','Medium')`, `event_date between $${params.length - 1}::date and $${params.length}::date`].join(" and ")}
+     group by 1, 2`,
+    params,
+  );
+  const counts = new Map<string, { high: number; medium: number }>();
+  for (const r of rows) {
+    const c = counts.get(r.b) ?? { high: 0, medium: 0 };
+    if (r.priority === "High") c.high = r.n;
+    else c.medium = r.n;
+    counts.set(r.b, c);
+  }
+
+  const buckets: Bucket[] = [];
+  if (daily) {
+    for (let i = 0; i < 7; i++) {
+      const day = addIso(today, i);
+      const c = counts.get(day) ?? { high: 0, medium: 0 };
+      buckets.push({ label: shortDay(day), from: day, to: day, ...c });
+    }
+  } else {
+    for (let start = mondayOf(today); start <= end; start = addIso(start, 7)) {
+      const c = counts.get(start) ?? { high: 0, medium: 0 };
+      buckets.push({ label: shortDay(start), from: start < today ? today : start, to: addIso(start, 6) > end ? end : addIso(start, 6), ...c });
+    }
+  }
+  return buckets;
+}
+
+export interface CitySlice {
+  city: string;
+  n: number;
+}
+
+/** Upcoming events by city (top 4 plus "Other"). Ignores the city filter so another city can be picked. */
+export async function eventsByCity(f: EventFilters): Promise<CitySlice[]> {
+  const { where, params } = buildWhere(f, ["view", "city", "priority"]);
+  const rows = await query<{ city: string; n: number }>(
+    `select coalesce(city, 'Unknown') as city, count(*)::int as n from events ${where.length ? `where ${where.join(" and ")}` : ""} group by 1 order by 2 desc`,
+    params,
+  );
+  const top = rows.slice(0, 4);
+  const other = rows.slice(4).reduce((a, r) => a + r.n, 0);
+  return other ? [...top, { city: "Other", n: other }] : top;
+}
+
+export interface KpiSeries {
+  events: number[];
+  high: number[];
+  deadlines: number[];
+  linkedin: number[];
+}
+
+/** 14-day lookahead for the KPI sparklines: how many upcoming events fall on each day (deadlines: close on each day). */
+export async function kpiSeries(today: string): Promise<KpiSeries> {
+  const rows = await query<{ day: string; events: number; high: number; linkedin: number; deadlines: number }>(
+    `with v as (
+       select event_date, registration_deadline, priority, is_linkedin_signal from events
+       where ${DATED_OR_MANUAL} and status <> 'past' and priority is distinct from 'Low'
+     )
+     select to_char(d, 'YYYY-MM-DD') as day,
+       (select count(*)::int from v where v.event_date = d::date) as events,
+       (select count(*)::int from v where v.event_date = d::date and v.priority = 'High') as high,
+       (select count(*)::int from v where v.event_date = d::date and v.is_linkedin_signal) as linkedin,
+       (select count(*)::int from v where v.registration_deadline = d::date) as deadlines
+     from generate_series($1::date, $1::date + 13, '1 day') d order by d`,
+    [today],
+  );
+  return {
+    events: rows.map((r) => r.events),
+    high: rows.map((r) => r.high),
+    deadlines: rows.map((r) => r.deadlines),
+    linkedin: rows.map((r) => r.linkedin),
+  };
 }
 
 export async function getEvent(id: number): Promise<EventRow | null> {

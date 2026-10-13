@@ -1,3 +1,4 @@
+@import "./theme.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -44,4 +45,34 @@ details > summary::-webkit-details-marker {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Charts: bars grow from the baseline, rings sweep in, sparklines draw. Only on load and on change. */
+.bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: bar-grow 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.ring-seg {
+  animation: ring-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.spark-line {
+  stroke-dasharray: 1;
+  animation: line-draw 0.9s ease-out both;
+}
+.chart-hit {
+  cursor: pointer;
+  outline: none;
+}
+.chart-hit:focus-visible {
+  stroke: rgb(var(--c-ink));
+  stroke-width: 2;
+}
+
+/* Thin, quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-slate-300)) transparent;
 }

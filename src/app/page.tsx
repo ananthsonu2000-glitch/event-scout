@@ -1,5 +1,8 @@
 import { Suspense } from "react";
-import { ChevronDown, Clock } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { ActiveFilters } from "@/components/ActiveFilters";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { CityRing } from "@/components/CityRing";
 import { ClosingSoon } from "@/components/ClosingSoon";
 import { DetailDrawer } from "@/components/DetailDrawer";
 import { EmptyState, ErrorState } from "@/components/EmptyState";
@@ -7,10 +10,10 @@ import { EventCard } from "@/components/EventCard";
 import { EventDetail } from "@/components/EventDetail";
 import { FilterBar } from "@/components/FilterBar";
 import { SummaryStats } from "@/components/SummaryStats";
+import { WeeklyChart } from "@/components/WeeklyChart";
 import { addDays, todayIST } from "@/lib/dates";
-import { dashboardMeta, filterOptions, getEvent, listEvents, viewCounts, type EventFilters } from "@/lib/queries";
+import { dashboardMeta, eventsByCity, eventsByPeriod, filterOptions, getEvent, kpiSeries, listEvents, viewCounts, type EventFilters } from "@/lib/queries";
 import type { EventRow } from "@/lib/types";
-import { timeAgo } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +34,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const view = VIEW_KEYS.includes(sp.view) ? sp.view : "all";
   const sort = sp.sort ?? "relevance";
   const today = todayIST();
+  const cr = (["7", "90"].includes(sp.cr) ? Number(sp.cr) : 30) as 7 | 30 | 90;
 
   // "This week" / "Next 30 days" presets become a date window; custom From/To wins when set.
   const from = sp.from ?? (sp.range ? today : undefined);
@@ -42,20 +46,23 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     return `/?${qs.toString()}`;
   };
 
-  const filters: EventFilters = { view, city: sp.city, category: sp.category, source: sp.source, from, to, q: sp.q, includePast: sp.past === "1", includeLow: sp.low === "1", sort };
+  const filters: EventFilters = { view, city: sp.city, category: sp.category, source: sp.source, from, to, q: sp.q, includePast: sp.past === "1", includeLow: sp.low === "1", priority: sp.priority, sort };
   const eventId = Number(sp.event);
 
   let data;
   try {
-    const [events, counts, options, meta, selected, closing] = await Promise.all([
+    const [events, counts, options, meta, selected, closing, byPeriod, byCity, series] = await Promise.all([
       listEvents(filters),
       viewCounts(),
       filterOptions(),
       dashboardMeta(today),
       eventId ? getEvent(eventId) : Promise.resolve(null),
       view === "deadline" ? Promise.resolve([] as EventRow[]) : listEvents({ view: "deadline", sort: "deadline" }, 8),
+      eventsByPeriod(filters, cr, today),
+      eventsByCity(filters),
+      kpiSeries(today),
     ]);
-    data = { events, counts, options, meta, selected, closing };
+    data = { events, counts, options, meta, selected, closing, byPeriod, byCity, series };
   } catch (err) {
     return (
       <ErrorState title="Can't load events" detail={String(err instanceof Error ? err.message : err)}>
@@ -65,9 +72,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </ErrorState>
     );
   }
-  const { events, counts, options, meta, selected, closing } = data;
+  const { events, counts, options, meta, selected, closing, byPeriod, byCity, series } = data;
   const grouped = sort === "relevance" && view !== "deadline";
-  const filtered = !!(sp.q || sp.city || sp.category || sp.source || sp.range || sp.from || sp.to || view !== "all");
+  const filtered = !!(sp.q || sp.city || sp.category || sp.source || sp.range || sp.from || sp.to || sp.priority || view !== "all");
   let n = 0;
 
   const card = (e: EventRow) => <EventCard key={e.id} event={e} href={href({ event: String(e.id) })} selected={selected?.id === e.id} today={today} delay={n++} />;
@@ -79,16 +86,25 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Event intelligence</h1>
           <p className="text-sm text-slate-500">Ranked opportunities for the next 30 days.</p>
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-slate-500" title="Time of the most recent scraper run">
-          <Clock size={13} aria-hidden /> Last updated {timeAgo(meta.lastRunEpoch)}
-        </p>
+        <AutoRefresh lastRunEpoch={meta.lastRunEpoch} />
       </div>
 
-      <SummaryStats counts={counts} meta={meta} activeView={view} hrefFor={(v) => href({ view: v === "all" ? undefined : v, event: undefined })} />
+      <SummaryStats counts={counts} meta={meta} series={series} activeView={view} hrefFor={(v) => href({ view: v === "all" ? undefined : v, event: undefined })} />
+
+      <p className="-mb-2 text-[11px] text-slate-400">Trend lines show events per day over the next 14 days.</p>
+
+      <Suspense fallback={<div className="card h-64 animate-pulse bg-slate-100" />}>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <WeeklyChart buckets={byPeriod} range={cr} />
+          <CityRing slices={byCity} />
+        </div>
+      </Suspense>
 
       <Suspense fallback={<div className="card h-32 animate-pulse bg-slate-100" />}>
         <FilterBar options={options} counts={counts} />
       </Suspense>
+
+      <ActiveFilters sp={sp} hrefWithout={(keys) => href(Object.fromEntries(keys.map((k) => [k, undefined])))} />
 
       {view !== "deadline" && !filtered && <ClosingSoon events={closing} today={today} hrefFor={(id) => href({ event: String(id) })} />}
 

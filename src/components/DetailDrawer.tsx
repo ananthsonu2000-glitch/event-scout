@@ -21,7 +21,7 @@ export function DetailDrawer({ closeHref, children }: { closeHref: string; child
 
   return (
     <>
-      <Link href={closeHref} scroll={false} aria-label="Close details" className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] lg:hidden" />
+      <Link href={closeHref} scroll={false} aria-label="Close details" className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] lg:hidden" />
       <aside
         role="dialog"
         aria-label="Event details"

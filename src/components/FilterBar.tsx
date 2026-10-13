@@ -97,7 +97,7 @@ export function FilterBar({ options, counts }: Props) {
   }, [q]);
 
   const advancedActive = !!(sp.get("from") || sp.get("to") || sp.get("past") || sp.get("low"));
-  const anyFilter = !!(sp.get("q") || sp.get("city") || sp.get("category") || sp.get("source") || range || view !== "all" || advancedActive || sort !== "relevance");
+  const anyFilter = !!(sp.get("q") || sp.get("city") || sp.get("category") || sp.get("source") || sp.get("priority") || sp.get("cr") || range || view !== "all" || advancedActive || sort !== "relevance");
 
   return (
     <section aria-label="Filters" className="card space-y-3 p-3 sm:p-4">

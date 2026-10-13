@@ -10,17 +10,17 @@ export function ScoreRing({ score, size = 44 }: { score: number | null; size?: n
   const stroke = 4;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const color = score >= 75 ? "#e11d48" : score >= 45 ? "#d97706" : "#94a3b8";
+  const color = score >= 75 ? "var(--chart-high)" : score >= 45 ? "var(--chart-medium)" : "var(--chart-low)";
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} title={`Relevance ${score}/100`} aria-label={`Relevance score ${score} out of 100`}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} style={{ stroke: "rgb(var(--c-slate-200))" }} />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={color}
+          style={{ stroke: `rgb(${color})` }}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
