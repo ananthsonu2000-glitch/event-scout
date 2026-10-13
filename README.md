@@ -108,7 +108,7 @@ npx playwright install chromium   # only if you enable playwright sources locall
 
 GitHub cron can start a few minutes late, and scheduled workflows in public repos pause after 60 days without repo activity (re-enable in the Actions tab).
 
-**Vercel Cron alternative for the digest:** `GET /api/cron/digest` (protected by `CRON_SECRET` via `Authorization: Bearer`). Add `{ "crons": [{ "path": "/api/cron/digest", "schedule": "30 1 * * 1" }] }` to `vercel.json`. The digest skips itself if one was already sent in the last 5 days, so running both is harmless. The daily scrape stays on GitHub Actions because Playwright and long Gemini runs don't fit serverless time limits.
+**Vercel Cron alternative for the digest:** `GET /api/cron/digest` (protected by `CRON_SECRET` via `Authorization: Bearer`). Add `{ "crons": [{ "path": "/api/cron/digest", "schedule": "30 1 * * 1" }] }` to `vercel.json`. The digest skips itself if one was already sent in the last 12 hours, so running both is harmless. The daily scrape stays on GitHub Actions because Playwright and long Gemini runs don't fit serverless time limits.
 
 ## Project layout
 

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: "Send even if a digest was already sent in the last 5 days"
+        description: "Send even if a digest was already sent in the last 12 hours"
         type: boolean
         default: false
 

@@ -138,8 +138,14 @@ export async function runDigest(opts: { force?: boolean; dryRun?: boolean } = {}
       await query(`insert into digest_runs (status, recipient, finished_at, error) values ('skipped', $1, now(), 'Digest disabled in preferences')`, [to ?? null]);
       return { status: "skipped", detail: "Digest disabled in preferences" };
     }
-    const [recent] = await query<{ n: string }>(`select count(*) as n from digest_runs where status = 'sent' and started_at > now() - interval '5 days'`);
-    if (Number(recent.n) > 0) return { status: "skipped", detail: "A digest was already sent in the last 5 days (use force to override)" };
+    // Only guards against two schedulers firing together (e.g. GitHub Actions and Vercel Cron). A short window means a
+    // test digest the day before never blocks the real Monday one.
+    const [recent] = await query<{ n: string }>(`select count(*) as n from digest_runs where status = 'sent' and started_at > now() - interval '12 hours'`);
+    if (Number(recent.n) > 0) {
+      const detail = "A digest was already sent in the last 12 hours (use force to override)";
+      await query(`insert into digest_runs (status, recipient, finished_at, error) values ('skipped', $1, now(), $2)`, [to ?? null, detail]);
+      return { status: "skipped", detail };
+    }
   }
 
   await refreshDerived(today);
