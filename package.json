@@ -14,7 +14,8 @@
     "selftest": "tsx scripts/selftest.ts",
     "gmail:auth": "tsx scripts/gmail-auth.ts",
     "rerank": "tsx scripts/rerank.ts",
-    "dedupe": "tsx scripts/dedupe-existing.ts"
+    "dedupe": "tsx scripts/dedupe-existing.ts",
+    "backfill:deadlines": "tsx scripts/backfill-deadlines.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",

@@ -63,7 +63,8 @@ export function extractJsonLdEvents($: cheerio.CheerioAPI): StructuredEvent[] {
 function mapEvent(n: any): StructuredEvent {
   const loc = Array.isArray(n.location) ? n.location[0] : n.location;
   const addr = loc?.address;
-  const offers = Array.isArray(n.offers) ? n.offers[0] : n.offers;
+  const offerList = ([] as any[]).concat(n.offers ?? []);
+  const offers = offerList.find((o) => o?.availabilityEnds || o?.validThrough) ?? offerList[0];
   const org = Array.isArray(n.organizer) ? n.organizer[0] : n.organizer;
   let price: string | undefined;
   if (n.isAccessibleForFree === true) price = "Free";
@@ -72,7 +73,8 @@ function mapEvent(n: any): StructuredEvent {
     title: n.name,
     description: typeof n.description === "string" ? n.description : undefined,
     event_date: n.startDate,
-    registration_deadline: offers?.validThrough,
+    // Eventbrite/AllEvents publish when ticket sales end as offers.availabilityEnds; some sites use validThrough.
+    registration_deadline: offers?.availabilityEnds ?? offers?.validThrough,
     venue: loc?.name,
     city: typeof addr === "string" ? undefined : addr?.addressLocality,
     organizer: org?.name,

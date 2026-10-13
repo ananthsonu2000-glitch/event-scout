@@ -1,4 +1,4 @@
-import { enrichWithDetailPages } from "./lib/enrich";
+import { addDeadlinesFromDetailPages, enrichWithDetailPages } from "./lib/enrich";
 import { extractItemsFromHtml, type ListingConfig } from "./lib/extract";
 import { fetchHtml } from "./lib/page";
 import type { ScrapedItem, ScraperFn } from "./types";
@@ -33,5 +33,7 @@ export const staticScraper: ScraperFn = async (source) => {
     }
   }
   if (!okPages) throw firstError ?? new Error("No listing page could be read");
-  return enrichWithDetailPages(items, source.url, source.config.max_detail_pages ?? 15);
+  const enriched = await enrichWithDetailPages(items, source.url, source.config.max_detail_pages ?? 15);
+  // config.deadline_from_detail: read the ticket-sales-end date from each event page (AllEvents, Eventbrite).
+  return source.config.deadline_from_detail ? addDeadlinesFromDetailPages(enriched, source.config.max_deadline_pages ?? 40) : enriched;
 };

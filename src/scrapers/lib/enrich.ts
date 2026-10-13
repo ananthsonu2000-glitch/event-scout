@@ -65,3 +65,32 @@ export async function enrichWithDetailPages(items: ScrapedItem[], listingUrl: st
   }
   return out;
 }
+
+/**
+ * Listing pages (AllEvents, Eventbrite) give the event but not when registration closes. That date is on each event's
+ * own page (ticket sales end). Open it for items that have structured data but no deadline yet.
+ * Skips URLs already stored, so only new events cost a fetch. Capped per run.
+ */
+export async function addDeadlinesFromDetailPages(items: ScrapedItem[], max = 40): Promise<ScrapedItem[]> {
+  const wants = (i: ScrapedItem) =>
+    !!i.url && !isLinkedInUrl(i.url) && !!(i.payload as any)?.structured && !(i.payload as any).structured.registration_deadline;
+  const candidates = items.filter(wants);
+  if (!candidates.length) return items;
+  const known = new Set(
+    (await query<{ u: string }>(`select raw_url as u from raw_events where raw_url = any($1)`, [candidates.map((c) => c.url)])).map((r) => r.u),
+  );
+  let budget = max;
+  for (const item of items) {
+    if (budget <= 0) break;
+    if (!wants(item) || known.has(item.url!)) continue;
+    budget--;
+    try {
+      const page = await fetchEventPage(item.url!);
+      const deadline = (page?.payload as any)?.structured?.registration_deadline;
+      if (deadline) (item.payload as any).structured.registration_deadline = deadline;
+    } catch (err) {
+      warnings.push(`${item.url} (${String(err instanceof Error ? err.message : err).slice(0, 60)})`);
+    }
+  }
+  return items;
+}
