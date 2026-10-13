@@ -1,3 +1,4 @@
+import { enrichWithDetailPages } from "./lib/enrich";
 import { extractItemsFromHtml, type ListingConfig } from "./lib/extract";
 import { isLinkedInUrl } from "./lib/page";
 import type { ScraperFn } from "./types";
@@ -30,7 +31,8 @@ export const playwrightScraper: ScraperFn = async (source) => {
         await page.waitForTimeout(800);
       }
     }
-    return extractItemsFromHtml(await page.content(), source.url, cfg);
+    const items = extractItemsFromHtml(await page.content(), source.url, cfg);
+    return enrichWithDetailPages(items, source.url, source.config.max_detail_pages ?? 15);
   } finally {
     await browser.close();
   }

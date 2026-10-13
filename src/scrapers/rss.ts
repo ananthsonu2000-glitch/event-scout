@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { enrichWithDetailPages } from "./lib/enrich";
 import type { ScraperFn } from "./types";
 
 /**
@@ -13,7 +14,7 @@ export const rssScraper: ScraperFn = async (source) => {
   const keywords: string[] = (source.config.keywords ?? []).map((k: string) => k.toLowerCase());
   const max: number = source.config.max_items ?? 30;
 
-  return (feed.items ?? [])
+  const items = (feed.items ?? [])
     .filter((it) => {
       if (!keywords.length) return true;
       const hay = `${it.title ?? ""} ${it.contentSnippet ?? ""}`.toLowerCase();
@@ -28,4 +29,7 @@ export const rssScraper: ScraperFn = async (source) => {
       payload: { published: it.isoDate ?? it.pubDate ?? null, categories: it.categories ?? [] },
     }))
     .filter((it) => it.title);
+
+  // Open each article so Gemini can read the date and city, not just the feed blurb.
+  return enrichWithDetailPages(items, null, source.config.max_detail_pages ?? 15);
 };

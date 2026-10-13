@@ -63,7 +63,7 @@ export function EventDetail({ event: e, closeHref, today }: { event: EventRow; c
       )}
 
       <dl className="mt-5 grid gap-3.5 sm:grid-cols-2">
-        <Fact icon={<CalendarDays size={15} />} label="Event date" value={e.event_date ? `${fmtDate(e.event_date, true)}${when ? ` (${when})` : ""}` : "Date not confirmed"} />
+        <Fact icon={<CalendarDays size={15} />} label="Event date" value={e.event_date ? `${fmtDate(e.event_date, true)}${when ? ` (${when})` : ""}` : "Date not found"} />
         <Fact icon={<MapPin size={15} />} label="City" value={e.city} />
         <Fact icon={<MapPin size={15} />} label="Venue" value={e.venue} />
         <Fact icon={<Building2 size={15} />} label="Organizer" value={e.organizer} />

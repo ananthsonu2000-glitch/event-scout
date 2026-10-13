@@ -44,7 +44,10 @@ export interface EventFilters {
   sort?: string;
 }
 
-const PRIORITY_ORDER = `case priority when 'High' then 1 when 'Medium' then 2 when 'Low' then 3 else 4 end`;
+/** SQL condition: the event has a date, or was added manually. */
+export const DATED_OR_MANUAL = `(event_date is not null or source_type like 'manual%')`;
+
+const PRIORITY_ORDER =`case priority when 'High' then 1 when 'Medium' then 2 when 'Low' then 3 else 4 end`;
 
 export async function listEvents(f: EventFilters, limit = 200): Promise<EventRow[]> {
   const where: string[] = [];
@@ -58,6 +61,8 @@ export async function listEvents(f: EventFilters, limit = 200): Promise<EventRow
   if (f.view === "deadline") where.push(`deadline_urgent`);
   if (f.view === "linkedin") where.push(`is_linkedin_signal`);
   if (f.view === "review") where.push(`needs_review`);
+  // Events with no date found are only listed under "Needs review" (manual entries are always shown).
+  if (f.view !== "review") where.push(DATED_OR_MANUAL);
   if (!f.includePast && f.view !== "review") where.push(`status <> 'past'`);
   if (f.city) where.push(`city = ${p(f.city)}`);
   if (f.category) where.push(`category = ${p(f.category)}`);
@@ -95,10 +100,10 @@ export async function getEvent(id: number): Promise<EventRow | null> {
 export async function viewCounts(): Promise<Record<string, number>> {
   const [r] = await query<Record<string, string>>(
     `select
-       count(*) filter (where status <> 'past') as "all",
-       count(*) filter (where priority = 'High' and status <> 'past') as high,
-       count(*) filter (where deadline_urgent and status <> 'past') as deadline,
-       count(*) filter (where is_linkedin_signal and status <> 'past') as linkedin,
+       count(*) filter (where status <> 'past' and ${DATED_OR_MANUAL}) as "all",
+       count(*) filter (where priority = 'High' and status <> 'past' and ${DATED_OR_MANUAL}) as high,
+       count(*) filter (where deadline_urgent and status <> 'past' and ${DATED_OR_MANUAL}) as deadline,
+       count(*) filter (where is_linkedin_signal and status <> 'past' and ${DATED_OR_MANUAL}) as linkedin,
        count(*) filter (where needs_review) as review
      from events`,
   );

@@ -28,7 +28,7 @@ export function toIsoDate(input?: string | null): string | null {
 }
 
 export function fmtDate(iso?: string | null, withYear = false): string {
-  if (!iso) return "Date TBC";
+  if (!iso) return "Date not found";
   const d = new Date(`${iso}T00:00:00Z`);
   return d.toLocaleDateString("en-IN", {
     day: "numeric",

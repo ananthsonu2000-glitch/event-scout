@@ -85,9 +85,10 @@ async function extractWithGemini(raw: RawEventRow, today: string): Promise<AiExt
   const prompt = `Today's date is ${today} (India). Extract structured event data from the item below.
 
 Rules:
-- is_event is true only for a specific upcoming conference, summit, roundtable, meetup, workshop or similar gathering. It is false for news articles, opinion pieces, job posts, ads, course listings, or recaps of past events.
+- is_event is true only for a specific upcoming (or currently running) conference, summit, roundtable, meetup, workshop or similar gathering. It is false for news articles, opinion pieces, job posts, ads, course listings, and anything about an event that has ALREADY taken place.
+- Past events: if the text is written in the past tense ("brought together", "was held", "explored", "concluded") or the event date is before today's date, set is_event to false. Still fill event_date if you can read it.
 - Use ONLY facts present in the text. Use null when unknown. Never guess dates.
-- Resolve relative dates ("this Friday") using today's date. Dates must be YYYY-MM-DD.
+- Resolve relative dates ("this Friday") using today's date. Dates must be YYYY-MM-DD. If no year is given, assume the next occurrence unless the text says it already happened.
 - registration_deadline only if a deadline/last date to register is explicitly stated.
 - city: the city name (e.g. Bengaluru, Mumbai, Delhi NCR) or "Online" for virtual events.
 - category: a short label such as "CXO", "Enterprise AI", "Startup", "SaaS", "Investor", "General Tech".
@@ -107,7 +108,10 @@ ${text}`;
  * Returns null when the item is not an event (stored as a rejected candidate), except manual submissions,
  * which are always kept and flagged for review.
  */
-export async function normalizeRaw(raw: RawEventRow, _prefs: Preferences, today: string): Promise<NormalizedEvent | null> {
+/** Either a normalized event, or the reason the item should be rejected (kept in raw_events for audit). */
+export type NormalizeResult = { event: NormalizedEvent } | { rejected: string };
+
+export async function normalizeRaw(raw: RawEventRow, _prefs: Preferences, today: string): Promise<NormalizeResult> {
   const s = (raw.raw_payload?.structured ?? {}) as Record<string, string | undefined>;
   const manual = raw.source_type.startsWith("manual");
 
@@ -130,7 +134,10 @@ export async function normalizeRaw(raw: RawEventRow, _prefs: Preferences, today:
   const structuredComplete = !!(s.title && base.event_date && (base.city || base.venue));
   if (!structuredComplete) {
     const ai = await extractWithGemini(raw, today);
-    if (!ai.is_event && !manual) return null;
+    if (!ai.is_event && !manual) {
+      const aiDate = toIsoDate(ai.event_date);
+      return { rejected: aiDate && aiDate < today ? `Past event (${aiDate})` : "Not an event" };
+    }
     base.title = clean(s.title ?? ai.title ?? raw.raw_title, 300) ?? base.title;
     base.description = base.description ?? clean(ai.description);
     base.event_date = base.event_date ?? toIsoDate(ai.event_date);
@@ -143,6 +150,8 @@ export async function normalizeRaw(raw: RawEventRow, _prefs: Preferences, today:
     base.price = base.price ?? clean(ai.price, 100);
   }
 
-  if (!base.title) return null;
-  return base;
+  if (!base.title) return { rejected: "No title" };
+  // Never store events that already happened. (Manual submissions are exempt: Vikram added them on purpose.)
+  if (!manual && base.event_date && base.event_date < today) return { rejected: `Past event (${base.event_date})` };
+  return { event: base };
 }

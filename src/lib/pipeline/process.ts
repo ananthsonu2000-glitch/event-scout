@@ -99,12 +99,13 @@ export async function processPending(limit = 60): Promise<ProcessResult> {
 
   for (const raw of pending) {
     try {
-      const n = await normalizeRaw(raw, prefs, today);
-      if (!n) {
-        await mark(raw.id, "rejected", "Not an event", null);
+      const result = await normalizeRaw(raw, prefs, today);
+      if ("rejected" in result) {
+        await mark(raw.id, "rejected", result.rejected, null);
         res.rejected++;
         continue;
       }
+      const n = result.event;
       const idx = findDuplicate(
         { title: n.title, event_date: n.event_date, city: n.city, organizer: n.organizer, source_url: n.source_url, sources: [] },
         existing,
@@ -145,7 +146,8 @@ export async function rankPending(limit = 50, batchSize = 5): Promise<RankResult
   const prefs = await getPreferences();
   const today = todayIST();
   const events = await query<EventRow>(
-    `select ${EVENT_COLS} from events where needs_rank and status <> 'past' order by id limit $1`,
+    // Undated events aren't ranked (a score without a date is meaningless). They are ranked once a date appears.
+    `select ${EVENT_COLS} from events where needs_rank and status <> 'past' and (event_date is not null or source_type like 'manual%') order by id limit $1`,
     [limit],
   );
 
