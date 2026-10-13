@@ -10,7 +10,8 @@ export interface EventRow {
   id: number;
   title: string;
   description: string | null;
-  event_date: string | null; // YYYY-MM-DD
+  event_date: string | null; // YYYY-MM-DD (the 1st of the month when date_precision is 'month')
+  date_precision: "exact" | "month";
   registration_deadline: string | null; // YYYY-MM-DD
   city: string | null;
   venue: string | null;

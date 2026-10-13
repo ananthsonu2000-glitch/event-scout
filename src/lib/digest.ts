@@ -113,7 +113,8 @@ export function buildDigest(events: EventRow[], dashboardUrl: string, today = to
 export async function fetchDigestEvents(today = todayIST()): Promise<EventRow[]> {
   return query<EventRow>(
     `select ${EVENT_COLS} from events
-     where event_date between $1::date and $2::date and status <> 'past' and status <> 'closed'`,
+     where event_date between $1::date and $2::date and date_precision = 'exact' and not needs_review
+       and status <> 'past' and status <> 'closed'`,
     [today, addDays(today, 30)],
   );
 }

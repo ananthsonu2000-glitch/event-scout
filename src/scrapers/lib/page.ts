@@ -44,6 +44,9 @@ export function extractJsonLdEvents($: cheerio.CheerioAPI): StructuredEvent[] {
     if (Array.isArray(node)) return node.forEach(visit);
     if (typeof node !== "object") return;
     if (node["@graph"]) visit(node["@graph"]);
+    // Eventbrite and others wrap events in an ItemList.
+    if (node.itemListElement) visit(node.itemListElement);
+    if (node["@type"] === "ListItem" && node.item) visit(node.item);
     const types = ([] as string[]).concat(node["@type"] ?? []);
     if (types.some((t) => /Event$/.test(String(t)))) out.push(mapEvent(node));
   };

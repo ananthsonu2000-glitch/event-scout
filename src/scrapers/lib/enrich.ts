@@ -4,12 +4,24 @@ import type { ScrapedItem } from "../types";
 
 const stripHash = (u: string) => u.split("#")[0].replace(/\/$/, "");
 
+/** Items whose full text is already attached (e.g. from an RSS feed's content) don't need their page fetched. */
+const MIN_TEXT = 800;
+
+let warnings: string[] = [];
+/** Detail pages that could not be read during the last scraper run (blocked, 404...). Cleared on read. */
+export function takeWarnings(): string[] {
+  const w = warnings;
+  warnings = [];
+  return w;
+}
+
 /**
  * Listing pages and feeds usually carry only a title and a short blurb. The date, city and deadline live on the
  * item's own page, so open it and attach its structured data and text for Gemini to read.
  *
- * Skips: LinkedIn (never fetched), items that already have structured data, links back to the listing itself,
- * and URLs already stored in raw_events (so a daily run doesn't re-fetch pages it has seen). Capped per run.
+ * Skips: LinkedIn (never fetched), items that already have structured data or full text, links back to the
+ * listing itself, and URLs already stored in raw_events (so a daily run doesn't re-fetch pages it has seen).
+ * Capped per run. Unreachable pages are recorded as warnings so they show up on the Source health page.
  */
 export async function enrichWithDetailPages(items: ScrapedItem[], listingUrl: string | null, max = 15): Promise<ScrapedItem[]> {
   const wanted = (i: ScrapedItem) =>
@@ -17,6 +29,7 @@ export async function enrichWithDetailPages(items: ScrapedItem[], listingUrl: st
     /^https?:/.test(i.url) &&
     !isLinkedInUrl(i.url) &&
     !(i.payload as any)?.structured &&
+    String((i.payload as any)?.text ?? "").length < MIN_TEXT &&
     (!listingUrl || stripHash(i.url) !== stripHash(listingUrl));
 
   const candidates = items.filter(wanted);
@@ -45,8 +58,8 @@ export async function enrichWithDetailPages(items: ScrapedItem[], listingUrl: st
         });
         continue;
       }
-    } catch {
-      /* page unreachable: keep the listing-level item */
+    } catch (err) {
+      warnings.push(`${item.url} (${String(err instanceof Error ? err.message : err).slice(0, 60)})`);
     }
     out.push(item);
   }

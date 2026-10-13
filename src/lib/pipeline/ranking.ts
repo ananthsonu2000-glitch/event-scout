@@ -46,6 +46,10 @@ Priority rules:
 - High: in a target city, strong business audience (CXO / founder / operator / investor relevance), within the next 30 days, registration open.
 - Medium: relevant topic but weaker audience, or less urgent / adjacent city or domain.
 - Low: generic webinar, wrong city, student / job-fair / training-heavy, weak networking value, or matches an excluded topic.
+- BE SELECTIVE. High should be roughly the top 15% of events, never the default. Use the full 0-100 range; do not give 95 to everything.
+- High needs ALL of: a substantial event (summit, conference, CXO or investor roundtable, curated founder-investor gathering, flagship ecosystem event); senior decision-makers in the audience (CXOs, CIOs/CTOs, founders of funded companies, investors); in one of the target cities (suburbs such as Thane or Navi Mumbai do not count as the target city); and within the next 30 days.
+- Generic open startup meetups, community and hobby groups, developer workshops and hackathons, "networking" events with a vague audience, and events aimed at students, beginners or job-seekers are Medium at best (score 35-65), usually Low.
+- Anything outside the target cities (Pune, Hyderabad, Agra, Kolkata, overseas...) is Low unless it is a genuinely exceptional CXO event.
 - Any registration deadline under 7 days must be called out in "urgency" and "recommended_action".
 - Be honest in "confidence" (0-1): use below 0.5 when key facts (date, city, audience) are missing or you are guessing.
 - Never invent facts; base the reason on the event data given.`;
@@ -54,8 +58,9 @@ export async function rankBatch(events: EventRow[], prefs: Preferences, today: s
   const payload = events.map((e) => ({
     id: e.id,
     title: e.title,
-    description: e.description?.slice(0, 700) ?? null,
+    description: e.description?.slice(0, 400) ?? null,
     event_date: e.event_date,
+    date_note: e.date_precision === "month" ? "Only the month is known (tentative)" : "Confirmed day",
     days_until_event: e.event_date ? daysBetween(today, e.event_date) : null,
     registration_deadline: e.registration_deadline,
     days_until_deadline: e.registration_deadline ? daysBetween(today, e.registration_deadline) : null,

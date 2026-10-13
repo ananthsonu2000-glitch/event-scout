@@ -1,5 +1,6 @@
 import { emailForwardScraper } from "./emailForward";
 import { googleAlertsScraper } from "./googleAlerts";
+import { lumaScraper } from "./luma";
 import { playwrightScraper } from "./playwright";
 import { rssScraper } from "./rss";
 import { staticScraper } from "./static";
@@ -13,6 +14,7 @@ import type { ScraperFn } from "./types";
 export const SCRAPERS: Record<string, ScraperFn> = {
   static: staticScraper,
   rss: rssScraper,
+  luma: lumaScraper,
   playwright: playwrightScraper,
   google_alerts: googleAlertsScraper,
   email_forward: emailForwardScraper,

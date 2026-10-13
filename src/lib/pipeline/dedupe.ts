@@ -31,7 +31,14 @@ export function canonicalUrl(url?: string | null): string | null {
   }
 }
 
-type Candidate = Pick<EventRow, "title" | "event_date" | "city" | "organizer" | "source_url" | "sources">;
+type Candidate = Pick<EventRow, "title" | "event_date" | "city" | "organizer" | "source_url" | "sources"> & { date_precision?: "exact" | "month" };
+
+/** Two dates are compatible when equal, or when either is a tentative month and they fall in the same month. */
+function dateConflict(a: Candidate, b: Candidate): boolean {
+  if (!a.event_date || !b.event_date) return false;
+  if (a.date_precision === "month" || b.date_precision === "month") return a.event_date.slice(0, 7) !== b.event_date.slice(0, 7);
+  return a.event_date !== b.event_date;
+}
 
 /**
  * Two records are the same event when they share a registration URL, or have very similar titles
@@ -44,10 +51,16 @@ export function isDuplicate(a: Candidate, b: Candidate): boolean {
 
   const sim = jaccard(titleTokens(a.title), titleTokens(b.title));
   const dateKnownBoth = !!a.event_date && !!b.event_date;
-  if (dateKnownBoth && a.event_date !== b.event_date) return false;
+  if (dateConflict(a, b)) return false;
   const cityOk = !a.city || !b.city || a.city === b.city;
   if (!cityOk) return false;
   if (sim >= 0.75) return true;
+  // One title contained in the other ("TechSparks 2026" vs "TechSparks 2026: The New Tech Order") on the same day and city.
+  const ta = titleTokens(a.title);
+  const tb = titleTokens(b.title);
+  const [small, big] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  const contained = small.size >= 1 && [...small].every((t) => big.has(t));
+  if (contained && dateKnownBoth && !!a.city && !!b.city && ([...small].some((t) => t.length >= 8) || small.size >= 3)) return true;
   const sameOrg = !!a.organizer && !!b.organizer && a.organizer.toLowerCase() === b.organizer.toLowerCase();
   return sim >= 0.5 && dateKnownBoth && (!!a.city || sameOrg);
 }
@@ -59,7 +72,7 @@ export function findDuplicate(candidate: Candidate, existing: Candidate[]): numb
 export type EventPatch = Partial<
   Pick<
     EventRow,
-    | "description" | "event_date" | "registration_deadline" | "city" | "venue" | "organizer" | "category"
+    | "description" | "event_date" | "date_precision" | "registration_deadline" | "city" | "venue" | "organizer" | "category"
     | "audience" | "price" | "source" | "source_type" | "source_url" | "sources" | "is_linkedin_signal"
   >
 >;
@@ -70,7 +83,12 @@ export function mergeEvent(existing: EventRow, n: NormalizedEvent): EventPatch {
   const fill = <K extends keyof NormalizedEvent & keyof EventRow>(k: K) => {
     if (!existing[k] && n[k]) (patch as any)[k] = n[k];
   };
-  (["event_date", "registration_deadline", "city", "venue", "organizer", "category", "audience", "price"] as const).forEach(fill);
+  (["registration_deadline", "city", "venue", "organizer", "category", "audience", "price"] as const).forEach(fill);
+  // A date fills a gap, and a confirmed day replaces a tentative month.
+  if (n.event_date && (!existing.event_date || (existing.date_precision === "month" && n.date_precision === "exact"))) {
+    patch.event_date = n.event_date;
+    patch.date_precision = n.date_precision;
+  }
   if (n.description && n.description.length > (existing.description?.length ?? 0) + 40) patch.description = n.description;
 
   // Sources list: add this sighting if new.

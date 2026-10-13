@@ -12,7 +12,9 @@
     "scrape": "tsx scripts/daily.ts",
     "digest": "tsx scripts/digest.ts",
     "selftest": "tsx scripts/selftest.ts",
-    "gmail:auth": "tsx scripts/gmail-auth.ts"
+    "gmail:auth": "tsx scripts/gmail-auth.ts",
+    "rerank": "tsx scripts/rerank.ts",
+    "dedupe": "tsx scripts/dedupe-existing.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",

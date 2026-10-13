@@ -42,7 +42,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     return `/?${qs.toString()}`;
   };
 
-  const filters: EventFilters = { view, city: sp.city, category: sp.category, source: sp.source, from, to, q: sp.q, includePast: sp.past === "1", sort };
+  const filters: EventFilters = { view, city: sp.city, category: sp.category, source: sp.source, from, to, q: sp.q, includePast: sp.past === "1", includeLow: sp.low === "1", sort };
   const eventId = Number(sp.event);
 
   let data;

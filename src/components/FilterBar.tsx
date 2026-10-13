@@ -96,7 +96,7 @@ export function FilterBar({ options, counts }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const advancedActive = !!(sp.get("from") || sp.get("to") || sp.get("past"));
+  const advancedActive = !!(sp.get("from") || sp.get("to") || sp.get("past") || sp.get("low"));
   const anyFilter = !!(sp.get("q") || sp.get("city") || sp.get("category") || sp.get("source") || range || view !== "all" || advancedActive || sort !== "relevance");
 
   return (
@@ -172,6 +172,10 @@ export function FilterBar({ options, counts }: Props) {
           <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
             <input type="checkbox" checked={sp.get("past") === "1"} onChange={(e) => push({ past: e.target.checked ? "1" : null })} className="h-4 w-4 rounded border-slate-300" />
             Include past events
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
+            <input type="checkbox" checked={sp.get("low") === "1"} onChange={(e) => push({ low: e.target.checked ? "1" : null })} className="h-4 w-4 rounded border-slate-300" />
+            Include low priority
           </label>
         </div>
       </details>

@@ -21,7 +21,7 @@ function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; va
 
 export function EventDetail({ event: e, closeHref, today }: { event: EventRow; closeHref: string; today: string }) {
   const dl = deadlineInfo(e.registration_deadline, e.deadline_urgent, e.status, today);
-  const when = relDays(e.event_date, today);
+  const when = e.date_precision === "month" ? null : relDays(e.event_date, today);
 
   return (
     <div className="p-5">
@@ -63,7 +63,7 @@ export function EventDetail({ event: e, closeHref, today }: { event: EventRow; c
       )}
 
       <dl className="mt-5 grid gap-3.5 sm:grid-cols-2">
-        <Fact icon={<CalendarDays size={15} />} label="Event date" value={e.event_date ? `${fmtDate(e.event_date, true)}${when ? ` (${when})` : ""}` : "Date not found"} />
+        <Fact icon={<CalendarDays size={15} />} label="Event date" value={e.event_date ? `${fmtDate(e.event_date, true, e.date_precision)}${when ? ` (${when})` : ""}` : "Date not found"} />
         <Fact icon={<MapPin size={15} />} label="City" value={e.city} />
         <Fact icon={<MapPin size={15} />} label="Venue" value={e.venue} />
         <Fact icon={<Building2 size={15} />} label="Organizer" value={e.organizer} />

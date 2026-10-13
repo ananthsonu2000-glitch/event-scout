@@ -49,7 +49,9 @@ Remove the sample events later with: `delete from events where raw_event_ids = '
 
 ### 3. Gemini
 
-Get a free key at <https://aistudio.google.com/apikey> → `GEMINI_API_KEY`. The default model is `gemini-3.8-flash` (override with `GEMINI_MODEL`). Free-tier rate limits are respected via `GEMINI_MIN_INTERVAL_MS` (default 4s between calls); a daily run of ~100 items takes several minutes.
+Get a free key at <https://aistudio.google.com/apikey> → `GEMINI_API_KEY`. The default model is `gemini-3.8-flash` (override with `GEMINI_MODEL`).
+
+**Quota matters.** The free tier allows only about **20 requests per day per model**. So the app (a) sends many items per request (6 per extraction call, 15 per ranking call, so a normal day needs roughly 10 calls), and (b) when one model's quota is used up, falls back to the next Flash model (`gemini-3.8-flash`, `gemini-3.5-flash`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`; set `GEMINI_MODELS` to change the chain). If every model is exhausted the run stops cleanly: unprocessed items stay `pending` and are picked up on the next run. Requests are also spaced by `GEMINI_MIN_INTERVAL_MS` (default 4s).
 
 ### 4. Gmail (reads alerts/forwards, optionally sends the digest)
 
@@ -130,10 +132,26 @@ src/app/                       dashboard, add, preferences, sources, health, ser
 
 For static/Playwright sources, set `sources.config` selectors, e.g. `{"item_selector": ".event-card", "title_selector": "h3", "date_selector": ".date", "link_selector": "a"}`. Without selectors the scraper uses schema.org Event JSON-LD, then event-looking links.
 
+## What gets stored (quality rules)
+
+Only clean, current events reach the dashboard and the digest:
+
+- **A date is required.** An exact day, or at least a tentative month (shown as "Nov 2026 (tentative)"). Items with no timing at all are rejected.
+- **Past events are rejected**, including past-tense write-ups and recaps (the full article or event page is read, not just the headline).
+- **A location is required** (city, venue or online). Online-only events and webinars are rejected.
+- **Off-topic items are dropped** by a cheap keyword prefilter (concerts, yoga, festivals, job fairs...), and Gemini rejects anything that is not a real event.
+- Events flagged **Needs review** (low AI confidence) and **Low priority** events stay out of the main list and the digest. They are visible under the *Needs review* view and via *More filters, Include low priority*.
+- The rejection reason for every dropped item is kept in `raw_events.processing_note` for auditing.
+
+## Sources
+
+Verified against the live sites. Structured sources (Luma, Meetup, AllEvents, Eventbrite, Express Computer, Bengaluru Tech Summit) carry dates on the listing; the others have each event's own page read. `config.extra_urls` adds more listing pages to a source. Currently off: TiE Bangalore (no events list), ET CIO (navigation links only), 10Times (blocks bots). Add or switch sources on the *Sources* page, or edit `scripts/sources-data.ts` and run `npm run db:seed` (re-seeding refreshes URL, config and on/off for the listed sources).
+
 ## Known limits (read before relying on it)
 
 - Neon/Gmail/Gemini/GitHub Actions paths were written against their documented APIs but **not exercised end to end** in the environment this was generated in (no credentials). The typecheck, production build and `npm run selftest` pass. Run `npm run db:migrate && npm run db:seed && npm run scrape` once and check **Source health**.
-- The seeded website sources (NASSCOM, TiE, ET CIO, Luma, Meetup, 10Times) use placeholder URLs/selectors that need verifying against the live pages. Several are seeded inactive for that reason. Failures are logged, not fatal.
+- Website layouts change. A source that stops returning items, or whose detail pages become unreadable, shows as failed or partial on *Source health*. Failures are logged, not fatal.
+- Broad listings (AllEvents, Meetup) are mostly startup and tech meetups. Flagship CXO events (CIO 100, Big CIO Show...) appear mainly through Google Alerts and the organizer pages in the source list, so set up the alerts.
 - Google Alerts email HTML changes occasionally. `parseAlertEmail` is heuristic, and failures appear in `email_intake_logs`.
 - The digest day/time preference is informational. Actual send time is the workflow cron. The enable toggle is honored.
 - Gemini free-tier quotas can defer ranking. Unprocessed items stay `pending` and unranked events keep `needs_rank`, so the next run picks them up.

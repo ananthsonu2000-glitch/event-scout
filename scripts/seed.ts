@@ -1,27 +1,7 @@
 import "./load-env";
 import { query } from "../src/lib/db";
 import { addDays, deriveStatus, todayIST } from "../src/lib/dates";
-
-const SOURCES = [
-  { name: "Google Alerts", url: null, type: "web_discovery", method: "google_alerts", cities: [], cats: ["LinkedIn", "Web"], active: true,
-    config: { query: "from:googlealerts-noreply@google.com newer_than:3d" }, notes: "Reads Google Alert emails from Gmail. LinkedIn results become LinkedIn signals." },
-  { name: "Gmail forwards", url: null, type: "email_forward", method: "email_forward", cities: [], cats: ["LinkedIn", "Manual"], active: true,
-    config: {}, notes: "Forwarded posts/invites labelled event-scout, plus LinkedIn notification emails." },
-  { name: "YourStory", url: "https://yourstory.com/feed", type: "media", method: "rss", cities: ["Bengaluru"], cats: ["Startup"], active: true,
-    config: { max_items: 30, keywords: ["summit", "conference", "meetup", "roundtable", "event", "expo", "forum"] }, notes: "RSS. Items are classified by Gemini (most are articles, not events)." },
-  { name: "NASSCOM Events", url: "https://nasscom.in/events", type: "industry_body", method: "static", cities: ["Bengaluru", "Delhi NCR"], cats: ["SaaS", "AI", "GCC"], active: true,
-    config: {}, notes: "Verify selectors for this page, then add item_selector etc. in config." },
-  { name: "TiE Bangalore", url: "https://bangalore.tie.org/events/", type: "startup_network", method: "static", cities: ["Bengaluru"], cats: ["Startup", "Investor"], active: true,
-    config: {}, notes: "Founder/investor events. Verify selectors." },
-  { name: "ET CIO Events", url: "https://cio.economictimes.indiatimes.com/events", type: "industry_events", method: "static", cities: ["Mumbai", "Bengaluru"], cats: ["CXO", "Enterprise"], active: false,
-    config: {}, notes: "Inactive until the page structure is verified." },
-  { name: "Luma Bengaluru", url: "https://lu.ma/bengaluru", type: "event_platform", method: "playwright", cities: ["Bengaluru"], cats: ["Startup", "Community"], active: false,
-    config: { wait_for: "a[href*='/']", scroll: true }, notes: "Dynamic page: uses the Playwright template. Tune config, then activate." },
-  { name: "Meetup Bengaluru Tech", url: "https://www.meetup.com/find/?location=in--bengaluru&source=EVENTS&keywords=startup", type: "event_platform", method: "playwright", cities: ["Bengaluru"], cats: ["Startup", "AI"], active: false,
-    config: { scroll: true }, notes: "Dynamic page: Playwright template." },
-  { name: "10Times India", url: "https://10times.com/india", type: "event_listing", method: "playwright", cities: ["Bengaluru", "Mumbai", "Delhi NCR"], cats: ["Conference", "Expo"], active: false,
-    config: { scroll: true }, notes: "Large listing. Enable after tuning." },
-];
+import { RETIRED, SOURCES } from "./sources-data";
 
 const PREFS = {
   target_cities: ["Bengaluru", "Mumbai", "Delhi NCR"],
@@ -40,14 +20,17 @@ const GOOGLE_ALERT_QUERIES = [
 async function main() {
   const withSamples = !process.argv.includes("--no-samples");
 
+  // Upsert by name: re-running the seed refreshes URL, method, config and the on/off flag from sources-data.ts.
   for (const s of SOURCES) {
     await query(
       `insert into sources (name, url, source_type, scrape_method, city_tags, category_tags, active, config, notes)
        values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)
-       on conflict (name) do nothing`,
+       on conflict (name) do update set url = excluded.url, source_type = excluded.source_type, scrape_method = excluded.scrape_method,
+         city_tags = excluded.city_tags, category_tags = excluded.category_tags, active = excluded.active, config = excluded.config, notes = excluded.notes`,
       [s.name, s.url, s.type, s.method, s.cities, s.cats, s.active, JSON.stringify(s.config), s.notes],
     );
   }
+  await query(`delete from sources where name = any($1)`, [RETIRED]);
   await query(
     `insert into vikram_preferences (id, target_cities, focus_domains, audience_types, excluded_topics, priority_rules)
      values (1, $1, $2, $3, $4, $5) on conflict (id) do nothing`,

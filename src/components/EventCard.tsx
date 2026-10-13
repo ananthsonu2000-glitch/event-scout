@@ -9,7 +9,7 @@ import { ScoreRing } from "./ScoreRing";
 export function EventCard({ event: e, href, selected, today, delay = 0 }: { event: EventRow; href: string; selected?: boolean; today: string; delay?: number }) {
   const rail = e.priority === "High" ? "bg-rose-500" : e.priority === "Medium" ? "bg-amber-400" : "bg-slate-300";
   const dl = deadlineInfo(e.registration_deadline, e.deadline_urgent, e.status, today);
-  const when = relDays(e.event_date, today);
+  const when = e.date_precision === "month" ? null : relDays(e.event_date, today);
   // One badge per distinct source label (LinkedIn + its Luma page etc.), capped to keep the card tidy.
   const seen = new Set<string>();
   const sources = e.sources.filter((s) => {
@@ -51,7 +51,7 @@ export function EventCard({ event: e, href, selected, today, delay = 0 }: { even
             <CalendarDays size={14} className="text-slate-400" aria-hidden />
             <dt className="sr-only">Date</dt>
             <dd>
-              {fmtDate(e.event_date)}
+              {fmtDate(e.event_date, false, e.date_precision)}
               {when && <span className="text-slate-400"> · {when}</span>}
             </dd>
           </div>

@@ -30,7 +30,7 @@ export function ClosingSoon({ events, hrefFor, today }: { events: EventRow[]; hr
               </div>
               <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">{e.title}</p>
               <p className="mt-1 text-xs text-slate-500">
-                {fmtDate(e.event_date)} · {e.city ?? "City unknown"}
+                {fmtDate(e.event_date, false, e.date_precision)} · {e.city ?? "City unknown"}
               </p>
             </Link>
           );
